@@ -1,0 +1,349 @@
+esphome:
+  name: ir_remote
+  name_add_mac_suffix: true  
+  friendly_name: IRBlaster
+
+esp32:
+  board: lolin_c3_mini
+  framework:
+    type: esp-idf
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+#  encryption:
+#    key: "-------------------------------------------"
+
+ota:
+  - platform: esphome
+#    password: "------------------------"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Irblaster Fallback Hotspot"
+    password: "FEVSjB3DCYJ1"
+
+captive_portal:
+    
+# LED-индикатор на GPIO6
+output:
+  - platform: gpio
+    pin: GPIO6
+    id: led_indicator
+
+remote_receiver: 
+  pin:
+    number: GPIO5
+  #  inverted: true
+
+  dump: pronto    
+  tolerance: 50%
+  on_pronto:
+    then:
+      - lambda: |-
+          if( id(learn_slot)>0 && id(learn_slot)<=7 ){
+             int i = 0;
+             for (i = 0; i < x.data.size(); i++) {
+                char c = (char)x.data[i];
+                switch(id(learn_slot)){
+                   case 1 : id(ir_code1)[i]=c; break;
+                   case 2 : id(ir_code2)[i]=c; break;
+                   case 3 : id(ir_code3)[i]=c; break;
+                   case 4 : id(ir_code4)[i]=c; break;
+                   case 5 : id(ir_code5)[i]=c; break;
+                   case 6 : id(ir_code6)[i]=c; break;
+                   case 7 : id(ir_code7)[i]=c; break;
+                }
+             }
+             switch(id(learn_slot)){
+                case 1 : id(ir_code1)[i]='\0';ESP_LOGI("IR REC", "Slot=%d Len=%d Data=%s", id(learn_slot), strlen(id(ir_code1)), id(ir_code1)); break;
+                case 2 : id(ir_code2)[i]='\0';ESP_LOGI("IR REC", "Slot=%d Len=%d Data=%s", id(learn_slot), strlen(id(ir_code2)), id(ir_code2)); break;
+                case 3 : id(ir_code3)[i]='\0';ESP_LOGI("IR REC", "Slot=%d Len=%d Data=%s", id(learn_slot), strlen(id(ir_code3)), id(ir_code3)); break;
+                case 4 : id(ir_code4)[i]='\0';ESP_LOGI("IR REC", "Slot=%d Len=%d Data=%s", id(learn_slot), strlen(id(ir_code4)), id(ir_code4)); break;
+                case 5 : id(ir_code5)[i]='\0';ESP_LOGI("IR REC", "Slot=%d Len=%d Data=%s", id(learn_slot), strlen(id(ir_code5)), id(ir_code5)); break;
+                case 6 : id(ir_code6)[i]='\0';ESP_LOGI("IR REC", "Slot=%d Len=%d Data=%s", id(learn_slot), strlen(id(ir_code6)), id(ir_code6)); break;
+                case 7 : id(ir_code7)[i]='\0';ESP_LOGI("IR REC", "Slot=%d Len=%d Data=%s", id(learn_slot), strlen(id(ir_code7)), id(ir_code7)); break;
+             }
+             id(learn_slot) = 0;
+             id(led_success).execute();
+          }
+#      - script.execute: led_success
+
+
+remote_transmitter:
+  pin: GPIO4
+  carrier_duty_percent: 50%
+  id: ir_tx
+
+switch:
+  - platform: template
+    name: IR Learning Mode
+    id: learning_mode
+    optimistic: true
+
+button:
+  - platform: template
+    name: "0Power"
+    id: btn01_power
+    icon: mdi:remote
+    on_press:
+      - script.execute: 
+          id: handle_button
+          slot: 1
+
+  - platform: template
+    name: "10%"
+    id: btn01_10
+    icon: mdi:remote
+    on_press:
+      - script.execute: 
+          id: handle_button
+          slot: 2
+
+  - platform: template
+    name: "50%"
+    id: btn01_50
+    icon: mdi:remote
+    on_press:
+      - script.execute: 
+          id: handle_button
+          slot: 3
+
+  - platform: template
+    name: "100%"
+    id: btn01_100
+    icon: mdi:remote
+    on_press:
+      - script.execute: 
+          id: handle_button
+          slot: 4
+
+  - platform: template
+    name: "3000K"
+    id: btn01_3000K
+    icon: mdi:remote
+    on_press:
+      - script.execute: 
+          id: handle_button
+          slot: 5
+
+  - platform: template
+    name: "4000K"
+    id: btn01_400K
+    icon: mdi:remote
+    on_press:
+      - script.execute: 
+          id: handle_button
+          slot: 6
+
+  - platform: template
+    name: "6500K"
+    id: btn01_6500K
+    icon: mdi:remote
+    on_press:
+      - script.execute: 
+          id: handle_button
+          slot: 7
+
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO2
+      mode: INPUT_PULLUP
+      inverted: true
+    name: "Button 0"
+    filters:
+      - delayed_on: 50ms
+      - delayed_off: 50ms
+    on_press:
+      then:
+        - script.execute: 
+            id: get_code
+            slot: 1
+        
+
+  - platform: gpio
+    pin:
+      number: GPIO1
+      mode: INPUT_PULLUP
+      inverted: true
+    name: "Button 1"
+    filters:
+      - delayed_on: 50ms
+      - delayed_off: 50ms
+    on_press:
+      then:
+        - script.execute: send_next_ir1       
+
+  - platform: gpio
+    pin:
+      number: GPIO0
+      mode: INPUT_PULLUP
+      inverted: true
+    name: "Button 2"
+    filters:
+      - delayed_on: 50ms
+      - delayed_off: 50ms
+    on_press:
+      then:
+        - script.execute: send_next_ir2       
+
+
+globals:
+  - id: ir_index1
+    type: int
+    restore_value: no
+    initial_value: '0'
+
+  - id: ir_index2
+    type: int
+    restore_value: no
+    initial_value: '0'
+
+  - id: learn_slot
+    type: int
+    restore_value: no
+    initial_value: '0'   
+
+  - id: ir_code1
+    type: char[450]
+    restore_value: yes
+    initial_value: ""
+
+  - id: ir_code2
+    type: char[450]
+    restore_value: yes
+    initial_value: ""
+      
+  - id: ir_code3
+    type: char[450]
+    restore_value: yes
+    initial_value: ""
+      
+  - id: ir_code4
+    type: char[450]
+    restore_value: yes
+    initial_value: ""
+      
+  - id: ir_code5
+    type: char[450]
+    restore_value: yes
+    initial_value: ""
+      
+  - id: ir_code6
+    type: char[450]
+    restore_value: yes
+    initial_value: ""
+      
+  - id: ir_code7
+    type: char[450]
+    restore_value: yes
+    initial_value: ""
+      
+script:
+  - id: led_once
+    then:
+      - output.turn_on: led_indicator
+      - delay: 200ms
+      - output.turn_off: led_indicator
+
+  - id: led_success
+    then:
+      - repeat:
+          count: 3
+          then:
+            - output.turn_on: led_indicator
+            - delay: 200ms
+            - output.turn_off: led_indicator
+            - delay: 200ms
+
+  - id: get_code
+    parameters:
+      slot: int
+    then:
+      - lambda: |-
+          if( slot>0 &&slot<=7){
+             std::string code = "";
+             int i;
+             switch(slot){
+                case 1 : code =  id(ir_code1); break;
+                case 2 : code =  id(ir_code2); break;
+                case 3 : code =  id(ir_code3); break;
+                case 4 : code =  id(ir_code4); break;
+                case 5 : code =  id(ir_code5); break;
+                case 6 : code =  id(ir_code6); break;
+                case 7 : code =  id(ir_code7); break;
+             }
+
+             ESP_LOGI("GET", "Slot=%d Len=%d Data=%s", slot, strlen(code.c_str()), code.c_str());
+             if(code.length() > 0){
+                id(send_ir).execute(code);
+                id(led_once).execute();
+             }
+          }
+
+  - id: send_ir
+    parameters:
+      code: string
+    then:
+      - remote_transmitter.transmit_pronto:
+          data: !lambda 'return code;'
+
+
+  - id: handle_button
+    parameters:
+      slot: int
+    then:
+      - lambda: |-
+          if(id(learning_mode).state){
+            id(learn_slot) = slot;
+            ESP_LOGI("STATE", "%d", id(learn_slot));
+          }
+      - if:
+          condition:
+            switch.is_off: learning_mode
+          then:
+            - script.execute:
+                id: get_code
+                slot: !lambda 'return slot;'
+
+  - id: send_next_ir1
+    mode: queued
+    then:
+      - lambda: |-
+          if (id(ir_index1) == 0) {
+             id(get_code).execute(2);
+          }
+          else if (id(ir_index1) == 1) {
+             id(get_code).execute(3);
+          }
+          else if (id(ir_index1) == 2) {
+             id(get_code).execute(4);
+          }
+          id(ir_index1)++;
+          if (id(ir_index1) > 2) id(ir_index1) = 0;
+
+  - id: send_next_ir2
+    mode: queued
+    then:
+      - lambda: |-
+          if (id(ir_index2) == 0) {
+             id(get_code).execute(5);
+          }
+          else if (id(ir_index2) == 1) {
+             id(get_code).execute(6);
+          }
+          else if (id(ir_index2) == 2) {
+             id(get_code).execute(7);
+          }
+          id(ir_index2)++;
+          if (id(ir_index2) > 2) id(ir_index2) = 0;
+
+
+
